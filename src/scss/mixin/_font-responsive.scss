@@ -1,0 +1,38 @@
+/**
+ * Font Responsive
+ *
+ * @param {number} $minFontSize - Min font size
+ * @param {number} $maxFontSize - Max font size
+ * @param {number} $minViewport - Min viewport size
+ * @param {number} $maxViewport - Max viewport size
+ */
+
+//  @include fontResponsive(MINpx, MAXpx, 768px, 1400px);
+
+@function strip-unit($number) {
+  @if type-of($number) == "number" and not unitless($number) {
+    @return calc($number / ($number * 0 + 1px));
+  }
+
+  @return $number;
+}
+
+@mixin fontResponsive($minFontSize, $maxFontSize, $minViewport, $maxViewport) {
+  $cleanMinFont: strip-unit($minFontSize);
+  $cleanMaxFont: strip-unit($maxFontSize);
+  $cleanMinViewport: strip-unit($minViewport);
+  $cleanMaxViewport: strip-unit($maxViewport);
+
+  font-size: $minFontSize;
+
+  @media (min-width: $minViewport) {
+    font-size: $maxFontSize;
+  }
+
+  @media (min-width: $minViewport) and (max-width: $maxViewport) {
+    font-size: calc(
+      #{$minFontSize} + (#{$cleanMaxFont} - #{$cleanMinFont}) * ((100vw - #{$minViewport}) /
+            (#{$cleanMaxViewport} - #{$cleanMinViewport}))
+    );
+  }
+}
