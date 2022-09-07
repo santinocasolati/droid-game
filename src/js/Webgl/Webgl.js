@@ -11,6 +11,7 @@ export default class Webgl {
 
         this.camera = new THREE.PerspectiveCamera(45, this.width / this.height, 0.1, 1000);
         this.camera.position.set(5, 10, 10);
+        this.camera.lookAt(0, 0, 0);
 
         this.scene = new THREE.Scene();
 
@@ -21,15 +22,7 @@ export default class Webgl {
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.container.appendChild(this.renderer.domElement);
 
-        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-        this.controls.enableRotate = false;
-        this.controls.enableZoom = false;
-        this.controls.mouseButtons = {
-            LEFT: THREE.MOUSE.PAN
-        };
-        this.controls.touches = {
-            ONE: THREE.TOUCH.PAN
-        };
+        // this.controls = new OrbitControls(this.camera, this.renderer.domElement);
 
         this.clock = new THREE.Clock();
 
@@ -37,6 +30,8 @@ export default class Webgl {
 
         this.floor();
         this.object();
+
+        this.setMovement();
 
         this.resize();
         this.setupResize();
@@ -46,66 +41,173 @@ export default class Webgl {
     physics() {
         this.world = new CANNON.World();
         this.world.gravity.set(0, -9.82, 0);
-        this.world.allowSleep = true;
-        this.world.broadphase = new CANNON.SAPBroadphase(this.world);
+        this.world.broadphase = new CANNON.NaiveBroadphase();
 
         this.physicsArray = [];
-
-        this.defaultMaterial = new CANNON.Material('default');
-
-        const defaultContactMaterial = new CANNON.ContactMaterial(
-            this.defaultMaterial,
-            this.defaultMaterial,
-            {
-                friction: 0.1,
-                restitution: 0.7,
-            },
-        );
-        this.world.addContactMaterial(defaultContactMaterial);
-        this.world.defaultContactMaterial = defaultContactMaterial;
     }
 
     floor() {
-        const floor = new THREE.Mesh(
+        this.floor = new THREE.Mesh(
             new THREE.PlaneGeometry(100, 100, 1, 1),
             new THREE.MeshBasicMaterial({ color: 'red', side: THREE.DoubleSide })
         );
 
-        this.scene.add(floor);
+        this.scene.add(this.floor);
 
-        floor.rotateX(-Math.PI / 2);
+        this.floor.rotateX(-Math.PI / 2);
 
-        const floorBody = new CANNON.Body({
+        this.floorBody = new CANNON.Body({
             mass: 0,
             shape: new CANNON.Plane()
         });
 
-        floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
-        this.world.addBody(floorBody);
+        this.floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+        this.world.addBody(this.floorBody);
     }
 
     object() {
         const box = new THREE.Mesh(
-            new THREE.BoxGeometry(1, 1, 1, 1, 1, 1),
+            new THREE.BoxGeometry(1, 1, 1),
             new THREE.MeshBasicMaterial({ color: 'green' })
         );
-        box.position.y = 0.6;
+        box.position.y = 3;
 
         this.scene.add(box);
 
         const boxBody = new CANNON.Body({
-            mass: 1,
+            mass: 5,
             shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)),
-            material: this.defaultMaterial
+            linearDamping: 0.5,
+            angularDamping: 1.0,
         });
         boxBody.position.copy(box.position);
 
         this.world.addBody(boxBody);
 
+        this.player = {
+            mesh: box,
+            body: boxBody
+        }
+
         this.physicsArray.push({
             mesh: box,
             body: boxBody
         });
+    }
+
+    setMovement() {
+        this.keysPressed = {
+            w: false,
+            s: false,
+            a: false,
+            d: false
+        }
+
+        window.addEventListener("keydown", (e) => {
+            const key = e.key.toLowerCase();
+            switch (key) {
+                case 'w':
+                    this.keysPressed.w = true;
+                    break;
+
+                case 's':
+                    this.keysPressed.s = true;
+                    break;
+
+                case 'a':
+                    this.keysPressed.a = true;
+                    break;
+
+                case 'd':
+                    this.keysPressed.d = true;
+                    break;
+
+                default:
+                    break;
+            }
+        });
+
+        window.addEventListener("keyup", (e) => {
+            const key = e.key.toLowerCase();
+            switch (key) {
+                case 'w':
+                    this.keysPressed.w = false;
+                    break;
+
+                case 's':
+                    this.keysPressed.s = false;
+                    break;
+
+                case 'a':
+                    this.keysPressed.a = false;
+                    break;
+
+                case 'd':
+                    this.keysPressed.d = false;
+                    break;
+
+                default:
+                    break;
+            }
+        });
+
+        window.addEventListener("keypress", (e) => {
+            const key = e.code.toLowerCase();
+
+            if (key === 'space') {
+                this.jump();
+            }
+        });
+
+        this.player.body.addEventListener("collide", (e) => {
+            if (e.body === this.floorBody) {
+                this.canJump = true;
+            }
+        })
+
+        this.axisY = new CANNON.Vec3(0, 1, 0);
+        this.rotationQuaternion = new CANNON.Quaternion();
+        this.localVelocity = new CANNON.Vec3();
+        this.moveDistance = 35;
+        this.jumpVelocity = 8;
+        this.canJump = false;
+    }
+
+    moveSystem(delta) {
+        let rotateAngle = (Math.PI / 2) * delta;
+
+        if (this.keysPressed.a) {
+            this.rotationQuaternion.setFromAxisAngle(this.axisY, rotateAngle);
+            this.player.body.quaternion = this.rotationQuaternion.mult(this.player.body.quaternion);
+        }
+
+        if (this.keysPressed.d) {
+            this.rotationQuaternion.setFromAxisAngle(this.axisY, -rotateAngle);
+            this.player.body.quaternion = this.rotationQuaternion.mult(this.player.body.quaternion);
+        }
+
+        this.localVelocity.set(0, 0, this.moveDistance * 0.2);
+        const worldVelocity = this.player.body.quaternion.vmult(this.localVelocity);
+
+        if (this.keysPressed.w) {
+            this.player.body.velocity.x = -worldVelocity.x;
+            this.player.body.velocity.z = -worldVelocity.z;
+        }
+
+        if (this.keysPressed.s) {
+            this.player.body.velocity.x = worldVelocity.x;
+            this.player.body.velocity.z = worldVelocity.z;
+        }
+
+        this.camera.position.x = this.player.mesh.position.x + 5;
+        this.camera.position.z = this.player.mesh.position.z + 10;
+    }
+
+    jump() {
+        if (this.canJump) {
+            this.canJump = false;
+            this.player.body.velocity.y = this.jumpVelocity;
+        }
     }
 
     resize() {
@@ -132,11 +234,12 @@ export default class Webgl {
     }
 
     render() {
-        this.controls.update();
+        // this.controls.update();
 
-        const delta = Math.min(this.clock.getDelta(), 0.1)
-        this.world.step(delta)
+        const delta = this.clock.getDelta();
+        this.world.step(1 / 60);
 
+        this.moveSystem(delta);
         this.physicsUpdate();
 
         this.renderer.render(this.scene, this.camera);
