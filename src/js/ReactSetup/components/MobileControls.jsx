@@ -58,7 +58,7 @@ export function MobileControls() {
     };
 
     const component =
-        <div className='mobile-controls'>
+        <div className={document.querySelector('html').dataset.device === 'desktop' ? 'mobile-controls off' : 'mobile-controls'}>
 
             <div className="movement">
                 <div className='up' onTouchStart={() => touchStart('w')} onTouchEnd={() => touchEnd('w')}>

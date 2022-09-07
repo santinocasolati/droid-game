@@ -10,6 +10,10 @@ $moveBtnSize: 60px;
     justify-content: space-between;
     padding: 0 10% 10% 10%;
 
+    &.off {
+        display: none;
+    }
+
     .movement {
         display: flex;
         flex-direction: column;

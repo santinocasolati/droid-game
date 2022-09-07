@@ -197,7 +197,7 @@ export default class Webgl {
         this.camera.position.set(5, 10, 10);
         this.camera.lookAt(0, 0, 0);
 
-        this.floorColor = new THREE.Color("red");
+        this.floorColor = new THREE.Color("#ccc");
         this.scene = new THREE.Scene();
         this.scene.background = this.floorColor;
 
@@ -280,10 +280,10 @@ export default class Webgl {
             this.width = this.container.offsetWidth;
             this.height = this.container.offsetHeight;
 
-            this.renderer.setSize(this.container.offsetWidth, this.container.offsetHeight);
-
             this.camera.aspect = this.width / this.height;
             this.camera.updateProjectionMatrix();
+
+            this.renderer.setSize(this.container.offsetWidth, this.container.offsetHeight);
         }, 100);
     }
 
