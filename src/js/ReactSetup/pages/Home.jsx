@@ -1,11 +1,10 @@
 import React from 'react'
+import { MobileControls } from '../components/MobileControls'
 
-export class Home extends React.Component {
-    render() {
-        return (
-            <main>
-
-            </main>
-        )
-    }
+export function Home() {
+    return (
+        <main className='home'>
+            <MobileControls />
+        </main>
+    )
 }

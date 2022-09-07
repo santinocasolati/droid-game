@@ -14,6 +14,8 @@
 @import "core/global.styles";
 
 /* Components */
+@import "app/section/home.main";
 
 /* Sections */
-@import "app/section/global.webgl-container";
+@import "app/components/global.webgl-container";
+@import "app/components/home.mobile-controls";

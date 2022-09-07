@@ -16,26 +16,31 @@ class PlayerMovement {
             w: false,
             s: false,
             a: false,
-            d: false
+            d: false,
+            space: false
         }
 
         window.addEventListener("keydown", (e) => {
-            const key = e.key.toLowerCase();
+            const key = e.code.toLowerCase();
             switch (key) {
-                case 'w':
+                case 'keyw':
                     this.keysPressed.w = true;
                     break;
 
-                case 's':
+                case 'keys':
                     this.keysPressed.s = true;
                     break;
 
-                case 'a':
+                case 'keya':
                     this.keysPressed.a = true;
                     break;
 
-                case 'd':
+                case 'keyd':
                     this.keysPressed.d = true;
+                    break;
+
+                case 'space':
+                    this.keysPressed.space = true;
                     break;
 
                 default:
@@ -44,34 +49,30 @@ class PlayerMovement {
         });
 
         window.addEventListener("keyup", (e) => {
-            const key = e.key.toLowerCase();
+            const key = e.code.toLowerCase();
             switch (key) {
-                case 'w':
+                case 'keyw':
                     this.keysPressed.w = false;
                     break;
 
-                case 's':
+                case 'keys':
                     this.keysPressed.s = false;
                     break;
 
-                case 'a':
+                case 'keya':
                     this.keysPressed.a = false;
                     break;
 
-                case 'd':
+                case 'keyd':
                     this.keysPressed.d = false;
+                    break;
+
+                case 'space':
+                    this.keysPressed.space = false;
                     break;
 
                 default:
                     break;
-            }
-        });
-
-        window.addEventListener("keypress", (e) => {
-            const key = e.code.toLowerCase();
-
-            if (key === 'space') {
-                this.jump();
             }
         });
 
@@ -86,7 +87,7 @@ class PlayerMovement {
         this.localVelocity = new CANNON.Vec3();
         this.moveDistance = 35;
         this.jumpVelocity = 8;
-        this.canJump = true;
+        this.canJump = false;
     }
 
     update(delta) {
@@ -113,6 +114,10 @@ class PlayerMovement {
         if (this.keysPressed.s) {
             this.player.body.velocity.x = worldVelocity.x;
             this.player.body.velocity.z = worldVelocity.z;
+        }
+
+        if (this.keysPressed.space) {
+            this.jump();
         }
 
         this.camera.position.x = this.player.mesh.position.x + 5;
