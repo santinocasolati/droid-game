@@ -190,8 +190,8 @@ class Physics {
 export default class Webgl {
     constructor(options) {
         this.container = options.domElement;
-        this.width = this.container.offsetWidth;
-        this.height = this.container.offsetHeight;
+        this.width = window.innerWidth;
+        this.height = window.innerHeight;
 
         this.camera = new THREE.PerspectiveCamera(45, this.width / this.height, 0.1, 1000);
         this.camera.position.set(5, 10, 10);
@@ -228,6 +228,7 @@ export default class Webgl {
 
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
         directionalLight.castShadow = true;
+        directionalLight.shadow.radius = 0;
         directionalLight.position.set(0, 100, 0);
         directionalLight.shadow.mapSize.width = 5120
         directionalLight.shadow.mapSize.height = 5120
@@ -277,14 +278,14 @@ export default class Webgl {
 
     resize() {
         setTimeout(() => {
-            this.width = this.container.offsetWidth;
-            this.height = this.container.offsetHeight;
+            this.width = window.innerWidth;
+            this.height = window.outerHeight;
+
+            this.renderer.setSize(this.width, this.height);
 
             this.camera.aspect = this.width / this.height;
             this.camera.updateProjectionMatrix();
-
-            this.renderer.setSize(this.container.offsetWidth, this.container.offsetHeight);
-        }, 100);
+        }, 300);
     }
 
     setupResize() {

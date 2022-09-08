@@ -35,6 +35,8 @@ export default class Site {
       this.initLocomotive();
       this.setReact();
       this.setWebgl();
+      this.resize();
+      this.setResize();
     });
   }
 
@@ -80,31 +82,31 @@ export default class Site {
       window.scroller.update();
       ScrollTrigger.refresh();
     };
-
-    window.addEventListener('resize', () => {
-      window.refreshPositions();
-    });
   }
 
   setReact() {
     new ReactSetup();
 
-    window.refreshPositions();
+    setTimeout(() => {
+      window.refreshPositions();
+    }, 500);
   }
 
   setWebgl() {
     window.webgl = new Webgl({
       domElement: document.querySelector('#webgl-container')
     });
+  }
 
-    ScrollTrigger.create({
-      trigger: '.o-scroll',
-      start: 'top top',
-      end: 'bottom bottom',
-      pin: '#webgl-container',
-      scrub: 1,
-      scroller: '.o-scroll'
-    })
+  resize() {
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+  }
+
+  setResize() {
+    window.addEventListener("resize", () => {
+      this.resize();
+    });
   }
 }
 
