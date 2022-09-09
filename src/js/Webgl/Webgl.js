@@ -16,8 +16,7 @@ class PlayerMovement {
             w: false,
             s: false,
             a: false,
-            d: false,
-            space: false
+            d: false
         }
 
         window.addEventListener("keydown", (e) => {
@@ -37,10 +36,6 @@ class PlayerMovement {
 
                 case 'keyd':
                     this.keysPressed.d = true;
-                    break;
-
-                case 'space':
-                    this.keysPressed.space = true;
                     break;
 
                 default:
@@ -67,27 +62,15 @@ class PlayerMovement {
                     this.keysPressed.d = false;
                     break;
 
-                case 'space':
-                    this.keysPressed.space = false;
-                    break;
-
                 default:
                     break;
             }
         });
 
-        this.player.body.addEventListener("collide", (e) => {
-            if (e.body === this.floorBody) {
-                this.canJump = true;
-            }
-        })
-
         this.axisY = new CANNON.Vec3(0, 1, 0);
         this.rotationQuaternion = new CANNON.Quaternion();
         this.localVelocity = new CANNON.Vec3();
         this.moveDistance = 35;
-        this.jumpVelocity = 8;
-        this.canJump = false;
     }
 
     update(delta) {
@@ -116,20 +99,8 @@ class PlayerMovement {
             this.player.body.velocity.z = worldVelocity.z;
         }
 
-        if (this.keysPressed.space) {
-            this.jump();
-        }
-
         this.camera.position.x = this.player.mesh.position.x + 5;
-        this.camera.position.y = this.player.mesh.position.y + 10;
         this.camera.position.z = this.player.mesh.position.z + 10;
-    }
-
-    jump() {
-        if (this.canJump) {
-            this.canJump = false;
-            this.player.body.velocity.y = this.jumpVelocity;
-        }
     }
 }
 
@@ -156,6 +127,35 @@ class Physics {
         this.world.addBody(this.floorBody);
 
         return this.floorBody;
+    }
+
+    worldBorder(pos) {
+
+        for (const dimension in pos) {
+            if (Object.hasOwnProperty.call(pos, dimension)) {
+                const dim = pos[dimension];
+
+                for (const arr in dim) {
+                    if (Object.hasOwnProperty.call(dim, arr)) {
+                        const positions = dim[arr];
+
+                        const border = new CANNON.Body({
+                            mass: 0,
+                            shape: new CANNON.Box(new CANNON.Vec3(300 * 0.5, 10 * 0.5, 2 * 0.5))
+                        });
+
+                        if (positions[2] !== 0) {
+                            border.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), -Math.PI / 2);
+                        }
+
+                        border.position.x = positions[0];
+                        border.position.z = positions[1];
+
+                        this.world.addBody(border);
+                    }
+                }
+            }
+        }
     }
 
     setPlayer(box) {
@@ -206,6 +206,7 @@ export default class Webgl {
             alpha: true
         });
         this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.container.appendChild(this.renderer.domElement);
 
@@ -228,22 +229,22 @@ export default class Webgl {
 
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
         directionalLight.castShadow = true;
-        directionalLight.shadow.radius = 0;
-        directionalLight.position.set(0, 100, 0);
-        directionalLight.shadow.mapSize.width = 5120
-        directionalLight.shadow.mapSize.height = 5120
-        directionalLight.shadow.camera.near = 0.1
-        directionalLight.shadow.camera.far = 500
-        directionalLight.shadow.camera.top = -100
-        directionalLight.shadow.camera.right = 100
-        directionalLight.shadow.camera.left = -100
-        directionalLight.shadow.camera.bottom = 100
+        // directionalLight.shadow.radius = 0.5;
+        directionalLight.position.set(0, 300, 0);
+        directionalLight.shadow.mapSize.width = 10240;
+        directionalLight.shadow.mapSize.height = 10240;
+        directionalLight.shadow.camera.near = 0.1;
+        directionalLight.shadow.camera.far = 500;
+        directionalLight.shadow.camera.top = -150;
+        directionalLight.shadow.camera.right = 150;
+        directionalLight.shadow.camera.left = -150;
+        directionalLight.shadow.camera.bottom = 150;
         this.scene.add(directionalLight);
     }
 
     floor() {
         this.floor = new THREE.Mesh(
-            new THREE.PlaneGeometry(100, 100, 1, 1),
+            new THREE.PlaneGeometry(300, 300, 1, 1),
             new THREE.MeshStandardMaterial({
                 color: this.floorColor
             })
@@ -254,6 +255,19 @@ export default class Webgl {
         this.floor.receiveShadow = true;
         this.floor.rotateX(-Math.PI / 2);
         this.floorBody = this.physics.floor();
+
+        const borderPos = {
+            z: {
+                pos: [0, 150, 0],
+                neg: [0, -150, 0]
+            },
+            x: {
+                pos: [150, 0, 1],
+                neg: [-150, 0, 1]
+            }
+        };
+
+        this.physics.worldBorder(borderPos);
     }
 
     setPlayer() {
