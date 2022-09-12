@@ -192,10 +192,10 @@ class Physics {
         }
     }
 
-    setPlayer(box) {
+    setPlayer(box, bounds) {
         const boxBody = new CANNON.Body({
             mass: 5,
-            shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)),
+            shape: new CANNON.Box(new CANNON.Vec3(bounds.x * 0.5, bounds.y * 0.5, bounds.z * 0.5)),
             linearDamping: 0.5,
             angularDamping: 1.0,
             material: this.material
@@ -210,6 +210,30 @@ class Physics {
         });
 
         return boxBody;
+    }
+
+    addItem(mesh, mass) {
+        const bbox = new THREE.Box3().setFromObject(mesh);
+
+        const bounds = {
+            x: (bbox.max.x - bbox.min.x),
+            y: (bbox.max.y - bbox.min.y),
+            z: (bbox.max.z - bbox.min.z)
+        }
+
+        const bboxBody = new CANNON.Body({
+            mass: mass,
+            shape: new CANNON.Box(new CANNON.Vec3(bounds.x * 0.5, bounds.y * 0.5, bounds.z * 0.5))
+        });
+
+        bboxBody.position.copy(mesh.position);
+
+        this.world.addBody(bboxBody);
+
+        this.physicsArray.push({
+            mesh: mesh,
+            body: bboxBody
+        });
     }
 
     update() {
@@ -234,7 +258,6 @@ export default class Webgl {
 
         this.floorColor = new THREE.Color("#ccc");
         this.scene = new THREE.Scene();
-        this.scene.background = this.floorColor;
 
         this.renderer = new THREE.WebGLRenderer({
             antialias: true,
@@ -315,7 +338,14 @@ export default class Webgl {
 
         this.scene.add(box);
 
-        const boxBody = this.physics.setPlayer(box);
+        const bbox = new THREE.Box3().setFromObject(box);
+        const bounds = {
+            x: (bbox.max.x - bbox.min.x),
+            y: (bbox.max.y - bbox.min.y),
+            z: (bbox.max.z - bbox.min.z)
+        }
+
+        const boxBody = this.physics.setPlayer(box, bounds);
 
         this.player = {
             mesh: box,
