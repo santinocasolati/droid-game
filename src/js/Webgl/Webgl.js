@@ -16,7 +16,8 @@ class PlayerMovement {
             w: false,
             s: false,
             a: false,
-            d: false
+            d: false,
+            space: false
         }
 
         window.addEventListener("keydown", (e) => {
@@ -36,6 +37,10 @@ class PlayerMovement {
 
                 case 'keyd':
                     this.keysPressed.d = true;
+                    break;
+
+                case 'space':
+                    this.keysPressed.space = true;
                     break;
 
                 default:
@@ -62,8 +67,18 @@ class PlayerMovement {
                     this.keysPressed.d = false;
                     break;
 
+                case 'space':
+                    this.keysPressed.space = false;
+                    break;
+
                 default:
                     break;
+            }
+        });
+
+        this.player.body.addEventListener("collide", (e) => {
+            if (e.body === this.floorBody) {
+                this.canJump = true;
             }
         });
 
@@ -71,6 +86,8 @@ class PlayerMovement {
         this.rotationQuaternion = new CANNON.Quaternion();
         this.localVelocity = new CANNON.Vec3();
         this.moveDistance = 35;
+        this.jumpVelocity = 8;
+        this.canJump = false;
     }
 
     update(delta) {
@@ -99,8 +116,20 @@ class PlayerMovement {
             this.player.body.velocity.z = worldVelocity.z;
         }
 
+        if (this.keysPressed.space) {
+            this.jump();
+        }
+
         this.camera.position.x = this.player.mesh.position.x + 5;
+        this.camera.position.y = this.player.mesh.position.y + 10;
         this.camera.position.z = this.player.mesh.position.z + 10;
+    }
+
+    jump() {
+        if (this.canJump) {
+            this.canJump = false;
+            this.player.body.velocity.y = this.jumpVelocity;
+        }
     }
 }
 
@@ -115,6 +144,10 @@ class Physics {
         this.world.broadphase = new CANNON.NaiveBroadphase();
 
         this.physicsArray = [];
+
+        this.material = new CANNON.Material();
+        this.contactMaterial = new CANNON.ContactMaterial(this.material, this.material, { friction: 0.0, restitution: 0.0 });
+        this.world.addContactMaterial(this.contactMaterial);
     }
 
     floor() {
@@ -141,7 +174,8 @@ class Physics {
 
                         const border = new CANNON.Body({
                             mass: 0,
-                            shape: new CANNON.Box(new CANNON.Vec3(300 * 0.5, 10 * 0.5, 2 * 0.5))
+                            shape: new CANNON.Box(new CANNON.Vec3(300 * 0.5, 10 * 0.5, 2 * 0.5)),
+                            material: this.material
                         });
 
                         if (positions[2] !== 0) {
@@ -164,6 +198,7 @@ class Physics {
             shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)),
             linearDamping: 0.5,
             angularDamping: 1.0,
+            material: this.material
         });
         boxBody.position.copy(box.position);
 
@@ -244,7 +279,7 @@ export default class Webgl {
 
     floor() {
         this.floor = new THREE.Mesh(
-            new THREE.PlaneGeometry(300, 300, 1, 1),
+            new THREE.PlaneGeometry(100, 100, 1, 1),
             new THREE.MeshStandardMaterial({
                 color: this.floorColor
             })
@@ -258,12 +293,12 @@ export default class Webgl {
 
         const borderPos = {
             z: {
-                pos: [0, 150, 0],
-                neg: [0, -150, 0]
+                pos: [0, 50, 0],
+                neg: [0, -50, 0]
             },
             x: {
-                pos: [150, 0, 1],
-                neg: [-150, 0, 1]
+                pos: [50, 0, 1],
+                neg: [-50, 0, 1]
             }
         };
 
