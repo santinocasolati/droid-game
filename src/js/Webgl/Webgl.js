@@ -174,7 +174,7 @@ class Physics {
 
                         const border = new CANNON.Body({
                             mass: 0,
-                            shape: new CANNON.Box(new CANNON.Vec3(300 * 0.5, 10 * 0.5, 2 * 0.5)),
+                            shape: new CANNON.Box(new CANNON.Vec3(300 * 0.5, 300 * 0.5, 2 * 0.5)),
                             material: this.material
                         });
 
