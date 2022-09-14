@@ -146,14 +146,19 @@ class Physics {
         this.physicsArray = [];
 
         this.material = new CANNON.Material();
+        this.floorMaterial = new CANNON.Material();
+
         this.contactMaterial = new CANNON.ContactMaterial(this.material, this.material, { friction: 0.0, restitution: 0.0 });
+        this.floorContactMaterial = new CANNON.ContactMaterial(this.material, this.floorMaterial, { friction: 0.01, restitution: 0.0 });
         this.world.addContactMaterial(this.contactMaterial);
+        this.world.addContactMaterial(this.floorContactMaterial);
     }
 
     floor() {
         this.floorBody = new CANNON.Body({
             mass: 0,
-            shape: new CANNON.Plane()
+            shape: new CANNON.Plane(),
+            material: this.floorMaterial
         });
 
         this.floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
