@@ -12,6 +12,7 @@
     "@testing-library/user-event": "^13.5.0",
     "bowser": "^2.11.0",
     "cannon-es": "^0.20.0",
+    "cannon-es-debugger": "^1.0.0",
     "dat.gui": "^0.7.9",
     "gsap": "file:gsap-bonus.tgz",
     "hamburger-react": "^2.5.0",
