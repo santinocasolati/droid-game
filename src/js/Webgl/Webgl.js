@@ -143,7 +143,6 @@ class PlayerControls {
         gsap.to(this.playerArray[0].children[0].children[4].rotation, { y: direction });
 
         this.camera.position.x = this.playerArray[0].position.x + this.camDistance.x;
-        // this.camera.position.y = this.playerArray[0].position.y + this.camDistance.y;
         this.camera.position.z = this.playerArray[0].position.z + this.camDistance.z;
     }
 }
@@ -159,6 +158,7 @@ class Physics {
 
     init() {
         this.debug();
+        this.contactMaterials();
         this.ground();
     }
 
@@ -169,8 +169,23 @@ class Physics {
         this.testScene.add(axes);
     }
 
-    ground() {
+    contactMaterials() {
         this.groundMaterial = new CANNON.Material();
+        this.wheelMaterial = new CANNON.Material("wheel");
+
+        const wheelContact = new CANNON.ContactMaterial(
+            this.groundMaterial,
+            this.wheelMaterial,
+            {
+                friction: 1,
+                restitution: 0
+            }
+        );
+
+        this.world.addContactMaterial(wheelContact);
+    }
+
+    ground() {
         const groundBody = new CANNON.Body({
             type: CANNON.Body.STATIC,
             shape: new CANNON.Plane(),
@@ -184,7 +199,7 @@ class Physics {
     car(bounds, mesh) {
         const carBody = new CANNON.Body({
             mass: 10,
-            position: new CANNON.Vec3(0, 6, 0),
+            position: new CANNON.Vec3(0, 1, 0),
             shape: new CANNON.Box(new CANNON.Vec3(bounds.x * 0.5, bounds.y / 4, bounds.z * 0.5))
         });
 
@@ -195,7 +210,7 @@ class Physics {
         const mass = 1;
         const axisWidth = 2;
         const wheelShape = new CANNON.Sphere(0.7);
-        this.wheelMaterial = new CANNON.Material("wheel");
+
         const down = new CANNON.Vec3(0, -1, 0);
 
         const wheelBody1 = new CANNON.Body({ mass, material: this.wheelMaterial });
@@ -261,7 +276,7 @@ export default class Webgl {
         this.height = window.innerHeight;
 
         this.camera = new THREE.PerspectiveCamera(45, this.width / this.height, 0.1, 1000);
-        this.camDistance = new THREE.Vector3(0, 10, 13);
+        this.camDistance = new THREE.Vector3(0, 8, 13);
         this.camera.position.copy(this.camDistance);
         this.camera.lookAt(0, 0, 0);
 
@@ -315,13 +330,22 @@ export default class Webgl {
     addFloor() {
         this.floor = new THREE.Mesh(
             new THREE.PlaneGeometry(100, 100, 1, 1),
-            new THREE.MeshStandardMaterial({
-                color: "red"
-            })
+            new THREE.MeshStandardMaterial()
         );
+
+        const grid = new THREE.GridHelper(100, 100);
+        this.scene.add(grid);
 
         this.scene.add(this.floor);
         this.floor.rotateX(-Math.PI / 2);
+
+        this.addFloorItems();
+    }
+
+    addFloorItems() {
+        // this.loader.load("static/models/name.glb", (model) => {
+        //     this.scene.add(model.scene);
+        // });
     }
 
     lights() {
