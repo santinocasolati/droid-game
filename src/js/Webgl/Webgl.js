@@ -6,11 +6,13 @@ import gsap from "gsap";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 
 class PlayerControls {
-    constructor(vehicle, playerArray, camDistance, camera) {
-        this.vehicle = vehicle;
-        this.playerArray = playerArray;
-        this.camDistance = camDistance;
+    constructor(mesh, bodies, camera, camDistance, light) {
+        this.mesh = mesh;
+        this.body = bodies[0];
+        this.floor = bodies[1];
         this.camera = camera;
+        this.camDistance = camDistance;
+        this.light = light;
 
         this.init();
     }
@@ -21,12 +23,25 @@ class PlayerControls {
 
     addListeners() {
         this.keysPressed = {
-            up: false,
-            down: false,
+            forward: false,
+            backward: false,
             right: false,
             left: false,
-            shift: 1
+            shift: 1,
+            jump: false
         }
+
+        this.canJump = false;
+        this.rotationQuaternion = new CANNON.Quaternion();
+        this.axisY = new CANNON.Vec3(0, 1, 0);
+        this.moveDistance = 15;
+        this.localVelocity = new CANNON.Vec3();
+
+        this.body.addEventListener('collide', (e) => {
+            if (e.body === this.floor) {
+                this.canJump = true;
+            }
+        })
 
         document.addEventListener("keydown", (e) => {
             const key = e.key.toLowerCase();
@@ -34,7 +49,7 @@ class PlayerControls {
             switch (key) {
                 case "w":
                 case "arrowup":
-                    this.keysPressed.up = true;
+                    this.keysPressed.forward = true;
                     break;
 
                 case "a":
@@ -44,7 +59,7 @@ class PlayerControls {
 
                 case "s":
                 case "arrowdown":
-                    this.keysPressed.down = true;
+                    this.keysPressed.backward = true;
                     break;
 
                 case "d":
@@ -53,11 +68,15 @@ class PlayerControls {
                     break;
 
                 case "shift":
-                    this.keysPressed.shift = 2;
+                    this.keysPressed.shift = 1.5;
                     break;
 
                 default:
                     break;
+            }
+
+            if (e.code.toLowerCase() === "space") {
+                this.keysPressed.jump = true;
             }
         });
 
@@ -67,7 +86,7 @@ class PlayerControls {
             switch (key) {
                 case "w":
                 case "arrowup":
-                    this.keysPressed.up = false;
+                    this.keysPressed.forward = false;
                     break;
 
                 case "a":
@@ -77,7 +96,7 @@ class PlayerControls {
 
                 case "s":
                 case "arrowdown":
-                    this.keysPressed.down = false;
+                    this.keysPressed.backward = false;
                     break;
 
                 case "d":
@@ -92,67 +111,58 @@ class PlayerControls {
                 default:
                     break;
             }
+
+            if (e.code.toLowerCase() === "space") {
+                this.keysPressed.jump = false;
+            }
         });
     }
 
-    update() {
-        const maxSteerVal = Math.PI / 8;
-        const maxForce = 10;
+    jump() {
+        if (this.canJump) {
+            this.canJump = false;
 
-        let direction = 0;
+            this.body.velocity.y = 8;
+        }
+    }
 
-        if (this.keysPressed.up || this.keysPressed.down) {
-            if (this.keysPressed.up && this.keysPressed.down) {
-                this.vehicle.setWheelForce(0, 2);
-                this.vehicle.setWheelForce(0, 3);
-            } else {
-                if (this.keysPressed.up) {
-                    this.vehicle.setWheelForce(-maxForce * this.keysPressed.shift, 2);
-                    this.vehicle.setWheelForce(-maxForce * this.keysPressed.shift, 3);
-                } else {
-                    if (this.keysPressed.down) {
-                        this.vehicle.setWheelForce(maxForce, 2);
-                        this.vehicle.setWheelForce(maxForce, 3);
-                    }
-                }
+    update(delta) {
+        this.body.velocity.x = 0;
+        this.body.velocity.z = 0;
+
+        let rotateAngle = (Math.PI / 2) * delta;
+        this.localVelocity.set(0, 0, this.moveDistance * 0.2);
+        const worldVelocity = this.body.quaternion.vmult(this.localVelocity);
+
+        if (!(this.keysPressed.forward && this.keysPressed.backward)) {
+            if (this.keysPressed.forward) {
+                this.body.velocity.x = -worldVelocity.x * this.keysPressed.shift;
+                this.body.velocity.z = -worldVelocity.z * this.keysPressed.shift;
             }
-        } else {
-            this.vehicle.setWheelForce(0, 2);
-            this.vehicle.setWheelForce(0, 3);
+
+            if (this.keysPressed.backward) {
+                this.body.velocity.x = worldVelocity.x;
+                this.body.velocity.z = worldVelocity.z;
+            }
         }
 
-        if (this.keysPressed.left || this.keysPressed.right) {
-            if (this.keysPressed.left && this.keysPressed.right) {
-                this.vehicle.setSteeringValue(0, 2);
-                this.vehicle.setSteeringValue(0, 3);
-            } else {
-                if (this.keysPressed.left) {
-                    this.vehicle.setSteeringValue(maxSteerVal, 2);
-                    this.vehicle.setSteeringValue(maxSteerVal, 3);
-                    direction = 0.2;
-                } else {
-                    if (this.keysPressed.right) {
-                        this.vehicle.setSteeringValue(-maxSteerVal, 2);
-                        this.vehicle.setSteeringValue(-maxSteerVal, 3);
-                        direction = -0.2;
-                    }
-                }
-            }
-        } else {
-            this.vehicle.setSteeringValue(0, 2);
-            this.vehicle.setSteeringValue(0, 3);
+        if (this.keysPressed.left) {
+            this.rotationQuaternion.setFromAxisAngle(this.axisY, rotateAngle);
+            this.body.quaternion = this.rotationQuaternion.mult(this.body.quaternion);
         }
 
-        this.playerArray[0].position.x = this.playerArray[1].position.x;
-        this.playerArray[0].position.y = this.playerArray[1].position.y - 0.9;
-        this.playerArray[0].position.z = this.playerArray[1].position.z;
-        this.playerArray[0].quaternion.copy(this.playerArray[1].quaternion);
+        if (this.keysPressed.right) {
+            this.rotationQuaternion.setFromAxisAngle(this.axisY, -rotateAngle);
+            this.body.quaternion = this.rotationQuaternion.mult(this.body.quaternion);
+        }
 
-        gsap.to(this.playerArray[0].children[0].children[3].rotation, { y: -direction });
-        gsap.to(this.playerArray[0].children[0].children[4].rotation, { y: direction });
+        if (this.keysPressed.jump) {
+            this.jump();
+        }
 
-        this.camera.position.x = this.playerArray[0].position.x + this.camDistance.x;
-        this.camera.position.z = this.playerArray[0].position.z + this.camDistance.z;
+        this.camera.position.x = this.mesh.position.x + this.camDistance.x;
+        this.camera.position.y = this.mesh.position.y + this.camDistance.y;
+        this.camera.position.z = this.mesh.position.z + this.camDistance.z;
     }
 }
 
@@ -161,6 +171,8 @@ class Physics {
         this.testScene = testScene;
 
         this.world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
+
+        this.physicsArray = [];
 
         this.init();
     }
@@ -180,105 +192,55 @@ class Physics {
 
     contactMaterials() {
         this.groundMaterial = new CANNON.Material();
-        this.wheelMaterial = new CANNON.Material("wheel");
+        this.playerMaterial = new CANNON.Material();
 
-        const wheelContact = new CANNON.ContactMaterial(
+        const playerContact = new CANNON.ContactMaterial(
             this.groundMaterial,
-            this.wheelMaterial,
+            this.playerMaterial,
             {
-                friction: 1,
+                friction: 0,
                 restitution: 0
             }
         );
 
-        this.world.addContactMaterial(wheelContact);
+        this.world.addContactMaterial(playerContact);
     }
 
     ground() {
-        const groundBody = new CANNON.Body({
+        this.groundBody = new CANNON.Body({
             type: CANNON.Body.STATIC,
             shape: new CANNON.Plane(),
             material: this.groundMaterial
         });
 
-        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
-        this.world.addBody(groundBody);
+        this.groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+        this.world.addBody(this.groundBody);
     }
 
-    car(bounds, mesh) {
-        const carBody = new CANNON.Body({
-            mass: 10,
-            position: new CANNON.Vec3(0, 1, 0),
-            shape: new CANNON.Box(new CANNON.Vec3(bounds.x * 0.5, bounds.y / 4, bounds.z * 0.5))
+    player(bounds, mesh) {
+        const playerBody = new CANNON.Body({
+            shape: new CANNON.Box(new CANNON.Vec3(bounds.x * 0.5, bounds.y * 0.5, bounds.z * 0.5)),
+            mass: 5,
+            position: new CANNON.Vec3(0, 6, 0),
+            material: this.playerMaterial,
+            linearDamping: 0.5,
+            angularDamping: 1.0
         });
+        this.world.addBody(playerBody);
 
-        this.vehicle = new CANNON.RigidVehicle({
-            chassisBody: carBody
-        });
+        this.physicsArray.push([mesh, playerBody]);
 
-        const mass = 1;
-        const axisWidth = 2;
-        const wheelShape = new CANNON.Sphere(0.7);
-
-        const down = new CANNON.Vec3(0, -1, 0);
-
-        const wheelBody1 = new CANNON.Body({ mass, material: this.wheelMaterial });
-        wheelBody1.addShape(wheelShape);
-        wheelBody1.angularDamping = 0.8;
-        wheelBody1.linearDamping = 0.8;
-        this.vehicle.addWheel({
-            body: wheelBody1,
-            position: new CANNON.Vec3(-0.95, -0.25, axisWidth / 2),
-            axis: new CANNON.Vec3(0, 0, 1),
-            direction: down
-        });
-
-        const wheelBody2 = new CANNON.Body({ mass, material: this.wheelMaterial });
-        wheelBody2.addShape(wheelShape);
-        wheelBody2.angularDamping = 0.8;
-        wheelBody2.linearDamping = 0.8;
-        this.vehicle.addWheel({
-            body: wheelBody2,
-            position: new CANNON.Vec3(-0.95, -0.25, -axisWidth / 2),
-            axis: new CANNON.Vec3(0, 0, 1),
-            direction: down
-        });
-
-        const wheelBody3 = new CANNON.Body({ mass, material: this.wheelMaterial });
-        wheelBody3.addShape(wheelShape);
-        wheelBody3.angularDamping = 0.8;
-        wheelBody3.linearDamping = 0.8;
-        this.vehicle.addWheel({
-            body: wheelBody3,
-            position: new CANNON.Vec3(0.6, -0.25, axisWidth / 2),
-            axis: new CANNON.Vec3(0, 0, 1),
-            direction: down
-        });
-
-        const wheelBody4 = new CANNON.Body({ mass, material: this.wheelMaterial });
-        wheelBody4.addShape(wheelShape);
-        wheelBody4.angularDamping = 0.8;
-        wheelBody4.linearDamping = 0.8;
-        this.vehicle.addWheel({
-            body: wheelBody4,
-            position: new CANNON.Vec3(0.6, -0.25, -axisWidth / 2),
-            axis: new CANNON.Vec3(0, 0, 1),
-            direction: down
-        });
-
-        this.vehicle.addToWorld(this.world);
-
-        const playerArray = [mesh, carBody, [wheelBody1, wheelBody2, wheelBody3, wheelBody4], bounds];
-
-        return {
-            pa: playerArray,
-            veh: this.vehicle
-        };
+        return [playerBody, this.groundBody];
     }
 
     update() {
         this.world.fixedStep();
         this.debugger.update();
+
+        this.physicsArray.forEach(pa => {
+            pa[0].position.copy(pa[1].position);
+            pa[0].quaternion.copy(pa[1].quaternion);
+        });
     }
 }
 
@@ -289,7 +251,7 @@ export default class Webgl {
         this.height = window.innerHeight;
 
         this.camera = new THREE.PerspectiveCamera(45, this.width / this.height, 0.1, 1000);
-        this.camDistance = new THREE.Vector3(0, 8, 13);
+        this.camDistance = new THREE.Vector3(2, 5, 10);
         this.camera.position.copy(this.camDistance);
         this.camera.lookAt(0, 0, 0);
 
@@ -301,6 +263,8 @@ export default class Webgl {
             alpha: true
         });
         this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.container.appendChild(this.renderer.domElement);
 
         this.clock = new THREE.Clock();
@@ -312,39 +276,40 @@ export default class Webgl {
     }
 
     init() {
-        this.addCar();
+        this.addPlayer();
 
         this.addFloor();
-
-        this.lights();
 
         this.resize();
         this.setupResize();
         this.render();
     }
 
-    addCar() {
-        this.loader.load("static/models/raceFuture.glb", (model) => {
-            this.scene.add(model.scene);
-            // this.testScene.add(model.scene);
+    addPlayer() {
+        const player = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 1, 1),
+            new THREE.MeshBasicMaterial({ color: 'red' })
+        )
+        player.castShadow = true;
+        this.scene.add(player);
 
-            const bbox = new THREE.Box3().setFromObject(model.scene);
-            const bounds = {
-                x: (bbox.max.x - bbox.min.x),
-                y: (bbox.max.y - bbox.min.y),
-                z: (bbox.max.z - bbox.min.z)
-            }
+        const bbox = new THREE.Box3().setFromObject(player);
+        const bounds = {
+            x: (bbox.max.x - bbox.min.x),
+            y: (bbox.max.y - bbox.min.y),
+            z: (bbox.max.z - bbox.min.z)
+        }
 
-            const controlItems = this.physics.car(bounds, model.scene);
-            this.controls = new PlayerControls(controlItems.veh, controlItems.pa, this.camDistance, this.camera);
-        });
+        const playerPhysics = this.physics.player(bounds, player);
+        this.controls = new PlayerControls(player, playerPhysics, this.camera, this.camDistance, this.lights);
     }
 
     addFloor() {
         this.floor = new THREE.Mesh(
             new THREE.PlaneGeometry(50, 50, 1, 1),
-            new THREE.MeshStandardMaterial()
+            new THREE.MeshBasicMaterial()
         );
+        this.floor.receiveShadow = true;
 
         const grid = new THREE.GridHelper(50, 50);
         this.scene.add(grid);
@@ -359,36 +324,6 @@ export default class Webgl {
         // this.loader.load("static/models/name.glb", (model) => {
         //     this.scene.add(model.scene);
         // });
-    }
-
-    lights() {
-        this.lightGroup = new THREE.Group();
-
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        this.scene.add(ambientLight);
-
-        const directionalLightUp = new THREE.DirectionalLight(0xffffff, 5);
-        directionalLightUp.position.set(0, 10, 0);
-        this.lightGroup.add(directionalLightUp);
-
-        const directionalLightLeft = new THREE.DirectionalLight(0xffffff, 5);
-        directionalLightLeft.position.set(-10, 0, 0);
-        this.lightGroup.add(directionalLightLeft);
-
-        const directionalLightRight = new THREE.DirectionalLight(0xffffff, 5);
-        directionalLightRight.position.set(10, 0, 0);
-        this.lightGroup.add(directionalLightRight);
-
-        const directionalLightFront = new THREE.DirectionalLight(0xffffff, 5);
-        directionalLightFront.position.set(0, 0, 10);
-        this.lightGroup.add(directionalLightFront);
-
-        const directionalLightBack = new THREE.DirectionalLight(0xffffff, 5);
-        directionalLightBack.position.set(0, 0, -10);
-        this.lightGroup.add(directionalLightBack);
-
-        this.scene.add(this.lightGroup);
-        // this.testScene.add(this.lightGroup);
     }
 
     resize() {
@@ -410,7 +345,7 @@ export default class Webgl {
     render() {
         this.physics.update();
 
-        if (this.controls) this.controls.update();
+        if (this.controls) this.controls.update(this.clock.getDelta());
 
         // this.renderer.render(this.testScene, this.camera);
         this.renderer.render(this.scene, this.camera);
