@@ -24,7 +24,8 @@ class PlayerControls {
             up: false,
             down: false,
             right: false,
-            left: false
+            left: false,
+            shift: 1
         }
 
         document.addEventListener("keydown", (e) => {
@@ -49,6 +50,10 @@ class PlayerControls {
                 case "d":
                 case "arrowright":
                     this.keysPressed.right = true;
+                    break;
+
+                case "shift":
+                    this.keysPressed.shift = 2;
                     break;
 
                 default:
@@ -80,6 +85,10 @@ class PlayerControls {
                     this.keysPressed.right = false;
                     break;
 
+                case "shift":
+                    this.keysPressed.shift = 1;
+                    break;
+
                 default:
                     break;
             }
@@ -98,8 +107,8 @@ class PlayerControls {
                 this.vehicle.setWheelForce(0, 3);
             } else {
                 if (this.keysPressed.up) {
-                    this.vehicle.setWheelForce(-maxForce, 2);
-                    this.vehicle.setWheelForce(-maxForce, 3);
+                    this.vehicle.setWheelForce(-maxForce * this.keysPressed.shift, 2);
+                    this.vehicle.setWheelForce(-maxForce * this.keysPressed.shift, 3);
                 } else {
                     if (this.keysPressed.down) {
                         this.vehicle.setWheelForce(maxForce, 2);
@@ -216,6 +225,7 @@ class Physics {
         const wheelBody1 = new CANNON.Body({ mass, material: this.wheelMaterial });
         wheelBody1.addShape(wheelShape);
         wheelBody1.angularDamping = 0.8;
+        wheelBody1.linearDamping = 0.8;
         this.vehicle.addWheel({
             body: wheelBody1,
             position: new CANNON.Vec3(-0.95, -0.25, axisWidth / 2),
@@ -226,6 +236,7 @@ class Physics {
         const wheelBody2 = new CANNON.Body({ mass, material: this.wheelMaterial });
         wheelBody2.addShape(wheelShape);
         wheelBody2.angularDamping = 0.8;
+        wheelBody2.linearDamping = 0.8;
         this.vehicle.addWheel({
             body: wheelBody2,
             position: new CANNON.Vec3(-0.95, -0.25, -axisWidth / 2),
@@ -236,6 +247,7 @@ class Physics {
         const wheelBody3 = new CANNON.Body({ mass, material: this.wheelMaterial });
         wheelBody3.addShape(wheelShape);
         wheelBody3.angularDamping = 0.8;
+        wheelBody3.linearDamping = 0.8;
         this.vehicle.addWheel({
             body: wheelBody3,
             position: new CANNON.Vec3(0.6, -0.25, axisWidth / 2),
@@ -246,6 +258,7 @@ class Physics {
         const wheelBody4 = new CANNON.Body({ mass, material: this.wheelMaterial });
         wheelBody4.addShape(wheelShape);
         wheelBody4.angularDamping = 0.8;
+        wheelBody4.linearDamping = 0.8;
         this.vehicle.addWheel({
             body: wheelBody4,
             position: new CANNON.Vec3(0.6, -0.25, -axisWidth / 2),
@@ -329,11 +342,11 @@ export default class Webgl {
 
     addFloor() {
         this.floor = new THREE.Mesh(
-            new THREE.PlaneGeometry(100, 100, 1, 1),
+            new THREE.PlaneGeometry(50, 50, 1, 1),
             new THREE.MeshStandardMaterial()
         );
 
-        const grid = new THREE.GridHelper(100, 100);
+        const grid = new THREE.GridHelper(50, 50);
         this.scene.add(grid);
 
         this.scene.add(this.floor);
