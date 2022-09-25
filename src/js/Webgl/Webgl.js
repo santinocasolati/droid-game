@@ -6,13 +6,15 @@ import gsap from "gsap";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 
 class PlayerControls {
-    constructor(mesh, bodies, camera, camDistance, light) {
+    constructor(mesh, bodies, camera, camDistance, light, objects) {
         this.mesh = mesh;
         this.body = bodies[0];
         this.floor = bodies[1];
         this.camera = camera;
         this.camDistance = camDistance;
         this.light = light;
+
+        this.objects = objects;
 
         this.init();
     }
@@ -27,8 +29,7 @@ class PlayerControls {
             backward: false,
             right: false,
             left: false,
-            shift: 1,
-            jump: false
+            shift: 1
         }
 
         this.canJump = false;
@@ -40,6 +41,12 @@ class PlayerControls {
         this.body.addEventListener('collide', (e) => {
             if (e.body === this.floor) {
                 this.canJump = true;
+            } else {
+                this.objects.forEach(obj => {
+                    if (e.body === obj[1]) {
+                        this.canJump = true;
+                    }
+                });
             }
         })
 
@@ -76,7 +83,7 @@ class PlayerControls {
             }
 
             if (e.code.toLowerCase() === "space") {
-                this.keysPressed.jump = true;
+                this.jump();
             }
         });
 
@@ -111,10 +118,6 @@ class PlayerControls {
                 default:
                     break;
             }
-
-            if (e.code.toLowerCase() === "space") {
-                this.keysPressed.jump = false;
-            }
         });
     }
 
@@ -122,13 +125,16 @@ class PlayerControls {
         if (this.canJump) {
             this.canJump = false;
 
-            this.body.velocity.y = 8;
+            this.body.velocity.y = 10;
         }
     }
 
     update(delta) {
-        this.body.velocity.x = 0;
-        this.body.velocity.z = 0;
+
+        if (this.canJump) {
+            this.body.velocity.x = 0;
+            this.body.velocity.z = 0;
+        }
 
         let rotateAngle = (Math.PI / 2) * delta;
         this.localVelocity.set(0, 0, this.moveDistance * 0.2);
@@ -154,10 +160,6 @@ class PlayerControls {
         if (this.keysPressed.right) {
             this.rotationQuaternion.setFromAxisAngle(this.axisY, -rotateAngle);
             this.body.quaternion = this.rotationQuaternion.mult(this.body.quaternion);
-        }
-
-        if (this.keysPressed.jump) {
-            this.jump();
         }
 
         this.camera.position.x = this.mesh.position.x + this.camDistance.x;
@@ -193,6 +195,8 @@ class Physics {
     contactMaterials() {
         this.groundMaterial = new CANNON.Material();
         this.playerMaterial = new CANNON.Material();
+        this.defaultMaterial = new CANNON.Material();
+        this.parkourMaterial = new CANNON.Material();
 
         const playerContact = new CANNON.ContactMaterial(
             this.groundMaterial,
@@ -203,7 +207,37 @@ class Physics {
             }
         );
 
+        const defaultContact = new CANNON.ContactMaterial(
+            this.playerMaterial,
+            this.defaultMaterial,
+            {
+                friction: 0,
+                restitution: 0.2
+            }
+        );
+
+        const defaultContactFloor = new CANNON.ContactMaterial(
+            this.playerMaterial,
+            this.defaultMaterial,
+            {
+                friction: 0.5,
+                restitution: 0.2
+            }
+        );
+
+        const parkourContact = new CANNON.ContactMaterial(
+            this.parkourMaterial,
+            this.playerMaterial,
+            {
+                friction: 0,
+                restitution: 0
+            }
+        );
+
         this.world.addContactMaterial(playerContact);
+        this.world.addContactMaterial(defaultContact);
+        this.world.addContactMaterial(defaultContactFloor);
+        this.world.addContactMaterial(parkourContact);
     }
 
     ground() {
@@ -231,6 +265,18 @@ class Physics {
         this.physicsArray.push([mesh, playerBody]);
 
         return [playerBody, this.groundBody];
+    }
+
+    addItem(mesh, bounds, mass, isParkour = false) {
+        const body = new CANNON.Body({
+            shape: new CANNON.Box(new CANNON.Vec3(bounds.x * 0.5, bounds.y * 0.5, bounds.z * 0.5)),
+            mass: mass,
+            position: new CANNON.Vec3(mesh.position.x, mesh.position.y, mesh.position.z)
+        });
+        body.material = isParkour ? this.parkourMaterial : this.defaultMaterial;
+
+        this.world.addBody(body);
+        this.physicsArray.push([mesh, body]);
     }
 
     update() {
@@ -301,7 +347,7 @@ export default class Webgl {
         }
 
         const playerPhysics = this.physics.player(bounds, player);
-        this.controls = new PlayerControls(player, playerPhysics, this.camera, this.camDistance, this.lights);
+        this.controls = new PlayerControls(player, playerPhysics, this.camera, this.camDistance, this.lights, this.physics.physicsArray);
     }
 
     addFloor() {
@@ -321,9 +367,22 @@ export default class Webgl {
     }
 
     addFloorItems() {
-        // this.loader.load("static/models/name.glb", (model) => {
-        //     this.scene.add(model.scene);
-        // });
+        const box = new THREE.Mesh(
+            new THREE.BoxGeometry(5, 1, 5),
+            new THREE.MeshBasicMaterial({ color: 'green' })
+        )
+        this.scene.add(box);
+        box.position.z = -10;
+        box.position.y = 2;
+
+        const bbox = new THREE.Box3().setFromObject(box);
+        const bounds = {
+            x: (bbox.max.x - bbox.min.x),
+            y: (bbox.max.y - bbox.min.y),
+            z: (bbox.max.z - bbox.min.z)
+        }
+
+        this.physics.addItem(box, bounds, 0, true);
     }
 
     resize() {
