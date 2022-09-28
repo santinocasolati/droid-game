@@ -6,13 +6,16 @@ import gsap from "gsap";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 
 class PlayerControls {
-    constructor(mesh, bodies, camera, camDistance, light, objects) {
+    constructor(mesh, bodies, camera, camDistance, light, objects, platforms) {
         this.mesh = mesh;
         this.body = bodies[0];
         this.floor = bodies[1];
         this.camera = camera;
         this.camDistance = camDistance;
         this.light = light;
+        this.platforms = platforms;
+
+        this.raycaster = new THREE.Raycaster();
 
         this.objects = objects;
 
@@ -29,26 +32,13 @@ class PlayerControls {
             backward: false,
             right: false,
             left: false,
-            shift: 1
+            shift: 1,
+            jump: false
         }
 
         this.canJump = false;
-        this.rotationQuaternion = new CANNON.Quaternion();
+        this.moveDistance = 5;
         this.axisY = new CANNON.Vec3(0, 1, 0);
-        this.moveDistance = 15;
-        this.localVelocity = new CANNON.Vec3();
-
-        this.body.addEventListener('collide', (e) => {
-            if (e.body === this.floor) {
-                this.canJump = true;
-            } else {
-                this.objects.forEach(obj => {
-                    if (e.body === obj[1]) {
-                        this.canJump = true;
-                    }
-                });
-            }
-        })
 
         document.addEventListener("keydown", (e) => {
             const key = e.key.toLowerCase();
@@ -83,7 +73,7 @@ class PlayerControls {
             }
 
             if (e.code.toLowerCase() === "space") {
-                this.jump();
+                this.keysPressed.jump = true;
             }
         });
 
@@ -118,6 +108,10 @@ class PlayerControls {
                 default:
                     break;
             }
+
+            if (e.code.toLowerCase() === "space") {
+                this.keysPressed.jump = false;
+            }
         });
     }
 
@@ -129,37 +123,53 @@ class PlayerControls {
         }
     }
 
-    update(delta) {
+    checkDistance() {
+        this.raycaster.set(new THREE.Vector3(this.mesh.position.x, this.mesh.position.y, this.mesh.position.z), new THREE.Vector3(0, -1, 0).normalize());
+        const intersects = this.raycaster.intersectObjects(this.platforms)
+
+        if (intersects.length > 0) {
+            return intersects[0].distance
+        }
+    }
+
+    update() {
+        const dist = this.checkDistance();
+
+        if (dist < 0.5) {
+            this.canJump = true;
+        }
 
         if (this.canJump) {
             this.body.velocity.x = 0;
             this.body.velocity.z = 0;
         }
 
-        let rotateAngle = (Math.PI / 2) * delta;
-        this.localVelocity.set(0, 0, this.moveDistance * 0.2);
-        const worldVelocity = this.body.quaternion.vmult(this.localVelocity);
-
         if (!(this.keysPressed.forward && this.keysPressed.backward)) {
             if (this.keysPressed.forward) {
-                this.body.velocity.x = -worldVelocity.x * this.keysPressed.shift;
-                this.body.velocity.z = -worldVelocity.z * this.keysPressed.shift;
+                this.body.velocity.z = -this.moveDistance * this.keysPressed.shift;
+                this.body.quaternion.setFromAxisAngle(this.axisY, 0);
             }
 
             if (this.keysPressed.backward) {
-                this.body.velocity.x = worldVelocity.x;
-                this.body.velocity.z = worldVelocity.z;
+                this.body.velocity.z = this.moveDistance * this.keysPressed.shift;
+                this.body.quaternion.setFromAxisAngle(this.axisY, 180 * (Math.PI / 180));
             }
         }
 
-        if (this.keysPressed.left) {
-            this.rotationQuaternion.setFromAxisAngle(this.axisY, rotateAngle);
-            this.body.quaternion = this.rotationQuaternion.mult(this.body.quaternion);
+        if (!(this.keysPressed.right && this.keysPressed.left)) {
+            if (this.keysPressed.left) {
+                this.body.velocity.x = -this.moveDistance * this.keysPressed.shift;
+                this.body.quaternion.setFromAxisAngle(this.axisY, 90 * (Math.PI / 180));
+            }
+
+            if (this.keysPressed.right) {
+                this.body.velocity.x = this.moveDistance * this.keysPressed.shift;
+                this.body.quaternion.setFromAxisAngle(this.axisY, 270 * (Math.PI / 180));
+            }
         }
 
-        if (this.keysPressed.right) {
-            this.rotationQuaternion.setFromAxisAngle(this.axisY, -rotateAngle);
-            this.body.quaternion = this.rotationQuaternion.mult(this.body.quaternion);
+        if (this.keysPressed.jump) {
+            this.jump();
         }
 
         this.camera.position.x = this.mesh.position.x + this.camDistance.x;
@@ -322,9 +332,9 @@ export default class Webgl {
     }
 
     init() {
-        this.addPlayer();
-
         this.addFloor();
+
+        this.addPlayer();
 
         this.resize();
         this.setupResize();
@@ -347,7 +357,7 @@ export default class Webgl {
         }
 
         const playerPhysics = this.physics.player(bounds, player);
-        this.controls = new PlayerControls(player, playerPhysics, this.camera, this.camDistance, this.lights, this.physics.physicsArray);
+        this.controls = new PlayerControls(player, playerPhysics, this.camera, this.camDistance, this.lights, this.physics.physicsArray, this.platforms);
     }
 
     addFloor() {
@@ -367,6 +377,8 @@ export default class Webgl {
     }
 
     addFloorItems() {
+        this.platforms = [this.floor];
+
         const box = new THREE.Mesh(
             new THREE.BoxGeometry(5, 1, 5),
             new THREE.MeshBasicMaterial({ color: 'green' })
@@ -374,6 +386,8 @@ export default class Webgl {
         this.scene.add(box);
         box.position.z = -10;
         box.position.y = 2;
+
+        this.platforms.push(box)
 
         const bbox = new THREE.Box3().setFromObject(box);
         const bounds = {
@@ -404,7 +418,7 @@ export default class Webgl {
     render() {
         this.physics.update();
 
-        if (this.controls) this.controls.update(this.clock.getDelta());
+        if (this.controls) this.controls.update();
 
         // this.renderer.render(this.testScene, this.camera);
         this.renderer.render(this.scene, this.camera);
